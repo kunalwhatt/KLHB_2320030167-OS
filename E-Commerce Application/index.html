@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-Commerce with Payment Gateway</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            color: #333;
+            text-align: center;
+            margin: 20px;
+        }
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 20px;
+        }
+        .inventory, .payment-method {
+            margin: 20px auto;
+            padding: 15px;
+            border: 2px solid #008cba;
+            border-radius: 10px;
+            max-width: 300px;
+            background-color: #e0f7fa;
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        button {
+            margin: 10px;
+            padding: 10px 20px;
+            font-size: 1rem;
+            background-color: #008cba;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        button:hover {
+            background-color: #005f73;
+        }
+        select {
+            font-size: 1rem;
+            padding: 5px;
+        }
+        .log {
+            margin-top: 20px;
+            padding: 20px;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            background-color: #ffffff;
+            box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .log h3 {
+            margin-bottom: 15px;
+            color: #555;
+        }
+        .log p {
+            font-size: 1rem;
+            margin: 5px 0;
+            padding: 5px;
+            background-color: #f9f9f9;
+            border-left: 5px solid #008cba;
+            text-align: left;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body>
+    <h1>E-Commerce Platform</h1>
+
+    <!-- Dynamic Inventory -->
+    <div class="inventory">
+        Select an Item: 
+        <select id="item-selector"></select>
+    </div>
+
+    <!-- Payment Method Selection -->
+    <div class="payment-method">
+        <label for="payment-method">Select Payment Method: </label>
+        <select id="payment-method">
+            <option value="credit-card">Credit Card</option>
+            <option value="debit-card">Debit Card</option>
+            <option value="paypal">PayPal</option>
+        </select>
+    </div>
+
+    <!-- Place Order Button -->
+    <button onclick="proceedToPayment()">Place Order</button>
+    
+    <!-- Log Section -->
+    <div class="log">
+        <h3>Order Logs</h3>
+        <div id="log"></div>
+        <h3>Order History</h3>
+        <div id="order-history"></div>
+    </div>
+
+    <script>
+        // Inventory data
+        let inventory = [
+            { id: 1, name: "Laptop", price: 1000 },
+            { id: 2, name: "Smartphone", price: 800 },
+            { id: 3, name: "Headphones", price: 200 },
+            { id: 4, name: "Keyboard", price: 50 },
+            { id: 5, name: "Mouse", price: 40 }
+        ];
+
+        // Populate item selector
+        const itemSelector = document.getElementById("item-selector");
+        inventory.forEach(item => {
+            const option = document.createElement("option");
+            option.value = item.id;
+            option.textContent = `${item.name} - $${item.price}`;
+            itemSelector.appendChild(option);
+        });
+
+        // Redirect to Payment Gateway
+        function proceedToPayment() {
+            const selectedItemId = parseInt(itemSelector.value);
+            const selectedItem = inventory.find(item => item.id === selectedItemId);
+            const selectedPaymentMethod = document.getElementById("payment-method").value;
+
+            if (!selectedItem) {
+                logMessage("No item selected. 🚫");
+                return;
+            }
+
+            const itemPrice = selectedItem.price;
+
+            // Generate a transaction token and redirect to payment page
+            const transactionToken = `TXN${Date.now()}`;
+            const paymentURL = `mock-payment-gateway.html?amount=${itemPrice}&token=${transactionToken}&item=${encodeURIComponent(selectedItem.name)}`;
+            
+            // Save details in local storage for post-payment handling
+            localStorage.setItem('transactionToken', transactionToken);
+            localStorage.setItem('selectedItem', JSON.stringify(selectedItem));
+            
+            // Redirect to the payment page
+            window.location.href = paymentURL;
+        }
+
+        // Check Payment Status (After Redirect Back)
+        function checkPaymentStatus() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const paymentStatus = urlParams.get('status'); // e.g., 'success' or 'failure'
+            const transactionToken = urlParams.get('token');
+
+            if (paymentStatus && transactionToken) {
+                const logDiv = document.getElementById("log");
+                const selectedItem = JSON.parse(localStorage.getItem('selectedItem'));
+
+                if (paymentStatus === 'success') {
+                    logDiv.innerHTML += `<p>✅ Payment Successful! Item: ${selectedItem.name}. Transaction ID: ${transactionToken}</p>`;
+                    addOrderToHistory(selectedItem, paymentStatus, transactionToken);
+                } else {
+                    logDiv.innerHTML += `<p>❌ Payment Failed. Please try again. Transaction ID: ${transactionToken}</p>`;
+                }
+
+                // Clear local storage
+                localStorage.removeItem('transactionToken');
+                localStorage.removeItem('selectedItem');
+            }
+        }
+
+        // Log messages
+        function logMessage(message) {
+            const logDiv = document.getElementById("log");
+            logDiv.innerHTML += `<p>${message}</p>`;
+        }
+
+        // Add successful order to order history
+        function addOrderToHistory(item, status, transactionToken) {
+            const orderHistoryDiv = document.getElementById("order-history");
+            const orderHistory = JSON.parse(localStorage.getItem('orderHistory')) || [];
+
+            const order = {
+                item: item.name,
+                price: item.price,
+                status: status,
+                transactionToken: transactionToken,
+                date: new Date().toLocaleString()
+            };
+
+            orderHistory.push(order);
+            localStorage.setItem('orderHistory', JSON.stringify(orderHistory));
+
+            // Update the UI with the new order history
+            displayOrderHistory();
+        }
+
+        // Display order history from local storage
+        function displayOrderHistory() {
+            const orderHistoryDiv = document.getElementById("order-history");
+            const orderHistory = JSON.parse(localStorage.getItem('orderHistory')) || [];
+
+            if (orderHistory.length === 0) {
+                orderHistoryDiv.innerHTML = "<p>No order history found.</p>";
+                return;
+            }
+
+            orderHistoryDiv.innerHTML = '';
+            orderHistory.forEach(order => {
+                orderHistoryDiv.innerHTML += `<p>Item: ${order.item}, Price: $${order.price}, Status: ${order.status}, Transaction ID: ${order.transactionToken}, Date: ${order.date}</p>`;
+            });
+        }
+
+        // Check payment status on page load
+        document.addEventListener("DOMContentLoaded", function() {
+            checkPaymentStatus();
+            displayOrderHistory();
+        });
+    </script>
+</body>
+</html>
